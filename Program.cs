@@ -1,4 +1,6 @@
-﻿using System;
+﻿//#define THREADS
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -48,6 +50,7 @@ namespace MongoBench {
         /// Program execution begins here.
         /// </summary>
         /// <param name="args">The args.</param>
+        [MTAThread()]
         static void Main(string[] args) {
             string input = null;
 
@@ -93,7 +96,13 @@ namespace MongoBench {
                     Debug.WriteLine("Creating Threads");
                     Mutex mutex = new Mutex(true, MUTEX_NAME);
                     Benchmark[] benchmarks = new Benchmark[numOfThreads];
-                    Task[] tasks = new Task[numOfThreads];
+
+                    #if THREADS
+                        Thread[] tasks = new Thread[numOfThreads];
+                    #else
+                        Task[] tasks = new Task[numOfThreads];
+                    #endif
+                    
                     for (int i = 0; i < numOfThreads; i++) {
                         benchmarks[i] = new Benchmark(numOfRecords,
                                             CONNECTION_STRING,
@@ -102,7 +111,12 @@ namespace MongoBench {
                                             COLLECTION_NAME,
                                             INDEX_FIELDS,
                                             INSERT_SAFE_MODE);
-                        tasks[i] = new Task(new Action(benchmarks[i].WaitForSignal));
+                        #if THREADS
+                            tasks[i] = new Thread(new ThreadStart(benchmarks[i].WaitForSignal));
+                        #else
+                            tasks[i] = new Task(new Action(benchmarks[i].WaitForSignal), TaskCreationOptions.LongRunning);
+                        #endif
+                        
                         tasks[i].Start();
                     }
 
@@ -112,7 +126,11 @@ namespace MongoBench {
                     mutex.Dispose();
 
                     //Wait for threads to complete execution
-                    while (tasks.Any(t => !t.IsCompleted)) { }
+                    #if THREADS
+                        while (tasks.Any(t => t.IsAlive)) { }
+                    #else
+                        while (tasks.Any(t => !t.IsCompleted)) { }
+                    #endif
 
                     //Copy to global array, required to calculate statistics
                     Array.Copy(benchmarks, 0, allBenchmarks, run * benchmarks.Length, benchmarks.Length);
