@@ -124,7 +124,6 @@ namespace MongoBench {
                 CalculateStatistics(numOfRecords, allBenchmarks);
                 Console.WriteLine("\nCompleted.");
             }
-            Console.Read();
         }
 
         /// <summary>
