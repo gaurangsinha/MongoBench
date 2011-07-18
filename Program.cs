@@ -1,4 +1,4 @@
-﻿//#define THREADS
+﻿#define THREADS
 
 using System;
 using System.Collections.Generic;
@@ -8,43 +8,14 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Configuration;
+using MongoBench.Benchmarks;
 
 namespace MongoBench {
 
     /// <summary>
-    /// 
+    /// MongoDB Benchmark
     /// </summary>
     class Program {
-
-        /// <summary>
-        /// Database connection string
-        /// </summary>
-        private static string CONNECTION_STRING = ConfigurationManager.ConnectionStrings["MongoConnectionString"].ConnectionString;
-        
-        /// <summary>
-        /// Mutext name to synchronize threads
-        /// </summary>
-        private static string MUTEX_NAME = ConfigurationManager.AppSettings["MUTEX_NAME"];
-
-        /// <summary>
-        /// Database name on which the benchmarks will be performed
-        /// </summary>
-        private static string DATABASE_NAME = ConfigurationManager.AppSettings["DATABASE_NAME"];
-
-        /// <summary>
-        /// Name of the collection on which records will be inserted and queries executed
-        /// </summary>
-        private static string COLLECTION_NAME = ConfigurationManager.AppSettings["COLLECTION_NAME"];
-
-        /// <summary>
-        /// Specifies if inserts are to be done in safe mode
-        /// </summary>
-        private static bool INSERT_SAFE_MODE = bool.Parse(ConfigurationManager.AppSettings["INSERT_SAFE_MODE"]);
-
-        /// <summary>
-        /// The fields on which indexes are supposed to be created
-        /// </summary>
-        private static string[] INDEX_FIELDS = ConfigurationManager.AppSettings["INDEX_FIELDS"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 
         /// <summary>
         /// Program execution begins here.
@@ -69,11 +40,10 @@ namespace MongoBench {
                 numOfThreads = 1;
 
             //Number of records to insert per thread
-            int numOfRecords = 1000;
             Console.Write("Records to insert per thread [1000] : ");
             input = Console.ReadLine();
-            if (!int.TryParse(input, out numOfRecords))
-                numOfRecords = 1000;
+            if (!int.TryParse(input, out Settings.NUM_OF_RECORDS))
+                Settings.NUM_OF_RECORDS = 1000;
 
             //Test connection string and database connection
             bool connectionStatus = TestDatabaseConnection();
@@ -83,63 +53,41 @@ namespace MongoBench {
             bool dataInitialized = Data.Initialize();
             Console.WriteLine("Initializing Temporary Data... {0}", dataInitialized ? "OK" : "ERROR");
 
-            Benchmark[] allBenchmarks = new Benchmark[numOfRuns * numOfThreads];
+            BenchmarkBase[] benchmarks = new BenchmarkBase[numOfRuns * ((numOfThreads * 3) + 1)];
             if (connectionStatus & dataInitialized) {
-                Console.WriteLine("\nRun\tThread\tName\t\t\tValue");
+                Console.WriteLine("\nRun\tThread\tTimee\tBenchmark");
 
                 for (int run = 0; run < numOfRuns; run++) {
-                    //Clear database
-                    bool cleanStatus = CleanDatabase();
-                    Debug.WriteLine("Cleaning database, removing existing entries... {0}", cleanStatus ? "OK" : "ERROR");
+                    //Clean database
+                    CleanDatabase();
 
-                    //Create threads
-                    Debug.WriteLine("Creating Threads");
-                    Mutex mutex = new Mutex(true, MUTEX_NAME);
-                    Benchmark[] benchmarks = new Benchmark[numOfThreads];
+                    int index = run * ((numOfThreads * 3) + 1);
 
-                    #if THREADS
-                        Thread[] tasks = new Thread[numOfThreads];
-                    #else
-                        Task[] tasks = new Task[numOfThreads];
-                    #endif
-                    
-                    for (int i = 0; i < numOfThreads; i++) {
-                        benchmarks[i] = new Benchmark(numOfRecords,
-                                            CONNECTION_STRING,
-                                            MUTEX_NAME,
-                                            DATABASE_NAME,
-                                            COLLECTION_NAME,
-                                            INDEX_FIELDS,
-                                            INSERT_SAFE_MODE);
-                        #if THREADS
-                            tasks[i] = new Thread(new ThreadStart(benchmarks[i].WaitForSignal));
-                        #else
-                            tasks[i] = new Task(new Action(benchmarks[i].WaitForSignal), TaskCreationOptions.LongRunning);
-                        #endif
-                        
-                        tasks[i].Start();
-                    }
+                    //Insert benchmarks
+                    BenchmarkBase[] results = ExecuteBenchmarks(numOfThreads, typeof(Insert), null);
+                    PrintResults(run, results);
+                    Array.Copy(results, 0, benchmarks, index, results.Length);
 
-                    //Start nechmark execution
-                    Debug.WriteLine("Run {0}, Starting to execute {1} thread", run + 1, numOfThreads);
-                    mutex.ReleaseMutex();
-                    mutex.Dispose();
+                    //Query benchmarks
+                    results = ExecuteBenchmarks(numOfThreads, typeof(CompositeQueries), string.Empty, false);
+                    PrintResults(run, results);
+                    index += results.Length;
+                    Array.Copy(results, 0, benchmarks, index, results.Length);
 
-                    //Wait for threads to complete execution
-                    #if THREADS
-                        while (tasks.Any(t => t.IsAlive)) { }
-                    #else
-                        while (tasks.Any(t => !t.IsCompleted)) { }
-                    #endif
+                    //Create Index
+                    index += results.Length;
+                    benchmarks[index] = new CreateIndex();
+                    benchmarks[index].ExecuteBenchmark();
+                    Console.WriteLine("{0}\t-\t{1}", run + 1, benchmarks[index].ToString());
 
-                    //Copy to global array, required to calculate statistics
-                    Array.Copy(benchmarks, 0, allBenchmarks, run * benchmarks.Length, benchmarks.Length);
-
-                    //Print results
-                    PrintResults(run, benchmarks);
+                    //Query benchmarks with indexes
+                    results = ExecuteBenchmarks(numOfThreads, typeof(CompositeQueries), "Indexed ", false);
+                    PrintResults(run, results);
+                    index += 1;
+                    Array.Copy(results, 0, benchmarks, index, results.Length);
                 }
                 Console.WriteLine("\nStatistics:");
-                CalculateStatistics(numOfRecords, allBenchmarks);
+                CalculateStatistics(Settings.NUM_OF_RECORDS, benchmarks);
                 Console.WriteLine("\nCompleted.");
             }
         }
@@ -151,7 +99,7 @@ namespace MongoBench {
         private static bool TestDatabaseConnection() {
             bool status = false;
             try {
-                var db = MongoDB.Driver.MongoServer.Create(CONNECTION_STRING);
+                var db = MongoDB.Driver.MongoServer.Create(Settings.CONNECTION_STRING);
                 db.Connect();
                 status = MongoDB.Driver.MongoServerState.Connected == db.State;
                 db.Disconnect();
@@ -170,7 +118,7 @@ namespace MongoBench {
         private static bool CleanDatabase() {
             bool status = false;
             try {
-                var db = MongoDB.Driver.MongoServer.Create(CONNECTION_STRING)[ConfigurationManager.AppSettings["DATABASE_NAME"]];
+                var db = MongoDB.Driver.MongoServer.Create(Settings.CONNECTION_STRING)[ConfigurationManager.AppSettings["DATABASE_NAME"]];
                 var posts = db[ConfigurationManager.AppSettings["COLLECTION_NAME"]];
                 var result = posts.RemoveAll();
                 db.DropCollection(ConfigurationManager.AppSettings["COLLECTION_NAME"]);
@@ -184,28 +132,48 @@ namespace MongoBench {
         }
 
         /// <summary>
-        /// Prints the results.
+        /// Executes the benchmarks.
         /// </summary>
-        /// <param name="bench">The bench.</param>
-        private static void PrintResults(int run, int thread, Benchmark bench) {
-            if (null != bench.InsertStats)
-                Console.WriteLine("{0}\t{1}\tInserts\t\t\t{2:0.0000}", run + 1, thread + 1, bench.InsertStats.ElapsedMilliseconds / 1000.0);
-            if (null != bench.SimpleSelectStats)
-                Console.WriteLine("{0}\t{1}\tSelect\t\t\t{2:0.0000}", run + 1, thread + 1, bench.SimpleSelectStats.ElapsedMilliseconds / 1000.0);
-            if (null != bench.SimpleFilterStats)
-                Console.WriteLine("{0}\t{1}\tFilter\t\t\t{2:0.0000}", run + 1, thread + 1, bench.SimpleFilterStats.ElapsedMilliseconds / 1000.0);
-            if (null != bench.MapReduceTagStats)
-                Console.WriteLine("{0}\t{1}\tMap-Reduce Tags\t\t{2:0.0000}", run + 1, thread + 1, bench.MapReduceTagStats.ElapsedMilliseconds / 1000.0);
-            if (null != bench.MapReduceCommentStats)
-                Console.WriteLine("{0}\t{1}\tMap-Reduce Comments\t{2:0.0000}", run + 1, thread + 1, bench.MapReduceCommentStats.ElapsedMilliseconds / 1000.0);
-            if (null != bench.CreateIndexStats)
-                Console.WriteLine("{0}\t{1}\tIndex Fields\t\t{2:0.0000}", run + 1, thread + 1, bench.CreateIndexStats.ElapsedMilliseconds / 1000.0);
-            if (null != bench.IndexedSimpleSelectStats)
-                Console.WriteLine("{0}\t{1}\tSelect with Index\t{2:0.0000}", run + 1, thread + 1, bench.IndexedSimpleSelectStats.ElapsedMilliseconds / 1000.0);
-            if (null != bench.IndexedSimpleFilterStats)
-                Console.WriteLine("{0}\t{1}\tFilter on Index\t\t{2:0.0000}", run + 1, thread + 1, bench.IndexedSimpleFilterStats.ElapsedMilliseconds / 1000.0);
-            if (null != bench.IndexedMapReduceTagStats)
-                Console.WriteLine("{0}\t{1}\tMap-Reduce Indexed\t{2:0.0000}", run + 1, thread + 1, bench.IndexedMapReduceTagStats.ElapsedMilliseconds / 1000.0);
+        /// <param name="numOfThreads">The num of threads.</param>
+        /// <param name="benchmarkType">Type of the benchmark.</param>
+        /// <param name="constructorParameters">The constructor parameters.</param>
+        /// <returns></returns>
+        private static BenchmarkBase[] ExecuteBenchmarks(int numOfThreads, Type benchmarkType, params object[] constructorParameters) {
+            BenchmarkBase[] benchmarks = new BenchmarkBase[numOfThreads];
+
+            //Create threads
+            Mutex mutex = new Mutex(true, Settings.MUTEX_NAME);
+
+            #if THREADS
+                Thread[] tasks = new Thread[numOfThreads];
+            #else
+                Task[] tasks = new Task[numOfThreads];
+            #endif
+                    
+            for (int i = 0; i < numOfThreads; i++) {
+                benchmarks[i] = Activator.CreateInstance(benchmarkType, constructorParameters) as BenchmarkBase;
+
+                #if THREADS
+                    tasks[i] = new Thread(new ThreadStart(benchmarks[i].ExecuteBenchmark));
+                #else
+                    tasks[i] = new Task(new Action(benchmarks[i].ExecuteBenchmark));
+                #endif
+
+                tasks[i].Start();
+            }
+
+            //Start nechmark execution
+            mutex.ReleaseMutex();
+            mutex.Dispose();
+
+            //Wait for threads to complete execution
+            #if THREADS
+                while (tasks.Any(t => t.IsAlive)) { }
+            #else
+                while (tasks.Any(t => !t.IsCompleted)) { }
+            #endif
+
+            return benchmarks;
         }
 
         /// <summary>
@@ -213,9 +181,11 @@ namespace MongoBench {
         /// </summary>
         /// <param name="run">The run.</param>
         /// <param name="benchmarks">The benchmarks.</param>
-        private static void PrintResults(int run, Benchmark[] benchmarks) {
+        private static void PrintResults(int run, BenchmarkBase[] benchmarks) {
             for (int i = 0; i < benchmarks.Length; i++) {
-                PrintResults(run, i, benchmarks[i]);
+                if (null != benchmarks[i]) {
+                    Console.WriteLine("{0}\t{1}\t{2}", run + 1, i + 1, benchmarks[i].ToString());
+                }
             }
         }
 
@@ -223,34 +193,43 @@ namespace MongoBench {
         /// Calculates the statistics.
         /// </summary>
         /// <param name="benchmarks">The benchmarks.</param>
-        private static void CalculateStatistics(int insertCount, Benchmark[] benchmarks) {
+        private static void CalculateStatistics(int insertCount, BenchmarkBase[] benchmarks) {
             //Calculate average inserts per second
-            var avgInsertsPerSecond = benchmarks.Average(b => (double)insertCount / (double)b.InsertStats.ElapsedMilliseconds);
+            var avgInsertsPerSecond = benchmarks
+                                        .Where(b => b.GetType() == typeof(Insert))
+                                        .Average(b => (double)insertCount / (double)b.Time.ElapsedMilliseconds);
             Console.WriteLine("{0:0.0000} : Average inserts/second", avgInsertsPerSecond * 1000.0);
 
-            var avgSelect = benchmarks.Average(b => b.SimpleSelectStats.ElapsedMilliseconds);
-            Console.WriteLine("{0:0.0000} : Average simple select", avgSelect / 1000.0);
+            CalculateStatistics(
+                benchmarks.Where(
+                    b => b.GetType() == typeof(CompositeQueries) && !b.Type.StartsWith("Indexed")));
 
-            var avgFilter = benchmarks.Average(b => b.SimpleFilterStats.ElapsedMilliseconds);
-            Console.WriteLine("{0:0.0000} : Average simple filter", avgFilter / 1000.0);
-
-            var avgMapReduceTags = benchmarks.Average(b => b.MapReduceTagStats.ElapsedMilliseconds);
-            Console.WriteLine("{0:0.0000} : Average Map-Reduce tags", avgMapReduceTags / 1000.0);
-
-            var avgMapReduceComments = benchmarks.Average(b => b.MapReduceCommentStats.ElapsedMilliseconds);
-            Console.WriteLine("{0:0.0000} : Average Map-Reduce comments", avgMapReduceComments / 1000.0);
-
-            var avgIndex = benchmarks.Average(b => b.CreateIndexStats.ElapsedMilliseconds);
+            var avgIndex = benchmarks
+                                .Where(b => b.GetType() == typeof(CreateIndex))
+                                .Average(b => b.Time.ElapsedMilliseconds);
             Console.WriteLine("{0:0.0000} : Average Create Index", avgIndex / 1000.0);
 
-            var avgSelectIndexed = benchmarks.Average(b => b.IndexedSimpleSelectStats.ElapsedMilliseconds);
-            Console.WriteLine("{0:0.0000} : Average simple select indexed", avgSelectIndexed / 1000.0);
+            CalculateStatistics(
+                benchmarks.Where(
+                    b => b.GetType() == typeof(CompositeQueries) && b.Type.StartsWith("Indexed")));
+        }
 
-            var avgFilterIndexed = benchmarks.Average(b => b.IndexedSimpleFilterStats.ElapsedMilliseconds);
-            Console.WriteLine("{0:0.0000} : Average simple filter indexed", avgFilterIndexed / 1000.0);
+        /// <summary>
+        /// Calculates the statistics.
+        /// </summary>
+        /// <param name="benchmarks">The composite query benchmarks.</param>
+        private static void CalculateStatistics(IEnumerable<BenchmarkBase> benchmarks) {
+            var avgSelect = benchmarks.Average(b => ((CompositeQueries)b).SimpleQuery.Time.ElapsedMilliseconds);
+            Console.WriteLine("{0:0.0000} : Average simple select", avgSelect / 1000.0);
 
-            var avgMapReduceTagIndexed = benchmarks.Average(b => b.IndexedMapReduceTagStats.ElapsedMilliseconds);
-            Console.WriteLine("{0:0.0000} : Average Map-Reduce tags indexed", avgMapReduceTagIndexed / 1000.0);
+            var avgFilter = benchmarks.Average(b => ((CompositeQueries)b).FilterQuery.Time.ElapsedMilliseconds);
+            Console.WriteLine("{0:0.0000} : Average simple filter", avgFilter / 1000.0);
+
+            var avgMapReduceTags = benchmarks.Average(b => ((CompositeQueries)b).TagCountMapReduce.Time.ElapsedMilliseconds);
+            Console.WriteLine("{0:0.0000} : Average Map-Reduce tags", avgMapReduceTags / 1000.0);
+
+            var avgMapReduceComments = benchmarks.Average(b => ((CompositeQueries)b).CommentAuthorMapReduce.Time.ElapsedMilliseconds);
+            Console.WriteLine("{0:0.0000} : Average Map-Reduce comments", avgMapReduceComments / 1000.0);            
         }
     }
 }

@@ -61,10 +61,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Benchmark.cs" />
+    <Compile Include="Benchmarks\BenchmarkBase.cs" />
+    <Compile Include="Benchmarks\CommentAuthorMapReduce.cs" />
+    <Compile Include="Benchmarks\CompositeQueries.cs" />
+    <Compile Include="Benchmarks\CreateIndex.cs" />
+    <Compile Include="Benchmarks\FilterQuery.cs" />
+    <Compile Include="Benchmarks\Insert.cs" />
+    <Compile Include="Benchmarks\SimpleQuery.cs" />
+    <Compile Include="Benchmarks\TagCountMapReduce.cs" />
     <Compile Include="Data.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Settings.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config">
@@ -77,6 +85,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
