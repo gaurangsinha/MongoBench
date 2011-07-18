@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using MongoDB.Bson;
+using MongoDB.Driver.Builders;
 
 namespace MongoBench.Benchmarks {
 
@@ -27,6 +28,7 @@ namespace MongoBench.Benchmarks {
         /// </summary>
         public override void Benchmark() {
             var db = GetDatabase();
+            var collectionName = "MongoBenchTemp";
             var result = db[Settings.COLLECTION_NAME]
                         .MapReduce(new BsonJavaScript(
                             @"function() {
@@ -43,8 +45,9 @@ namespace MongoBench.Benchmarks {
                                     total += values[i].count;
                                 }
                                 return { count : total };
-                            };"));
-            var tags = db[result.CollectionName].FindAll().ToList();
+                            };"),
+                            MapReduceOptions.SetOutput(MapReduceOutput.Replace(collectionName)));
+            var tags = db[collectionName].FindAll().ToList();
         }
     }
 }
