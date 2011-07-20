@@ -14,13 +14,13 @@ namespace MongoBench.Benchmarks {
         /// <summary>
         /// Initializes a new instance of the <see cref="SimpleQuery"/> class.
         /// </summary>
-        public SimpleQuery() : this(false) { }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SimpleQuery"/> class.
-        /// </summary>
+        /// <param name="connectionString">The connection string.</param>
+        /// <param name="databaseName">Name of the database.</param>
+        /// <param name="collectionName">Name of the collection.</param>
         /// <param name="waitForMutex">if set to <c>true</c> [wait for mutex].</param>
-        public SimpleQuery(bool waitForMutex) : base("Simple Query", waitForMutex) { }
+        /// <param name="mutextName">Name of the mutext.</param>
+        public SimpleQuery(string connectionString, string databaseName, string collectionName, bool waitForMutex, string mutextName) 
+            : base("Simple Query", connectionString, databaseName, collectionName, waitForMutex, mutextName) { }
 
         /// <summary>
         /// Simple query, get by author name

@@ -37,19 +37,30 @@ namespace MongoBench.Benchmarks {
         /// <summary>
         /// Initializes a new instance of the <see cref="CompositeQueries"/> class.
         /// </summary>
-        /// <param name="name">The name.</param>
-        public CompositeQueries(string name) : this(name, false) { }
+        /// <param name="connectionString">The connection string.</param>
+        /// <param name="databaseName">Name of the database.</param>
+        /// <param name="collectionName">Name of the collection.</param>
+        /// <param name="waitForMutex">if set to <c>true</c> [wait for mutex].</param>
+        /// <param name="mutextName">Name of the mutext.</param>
+        public CompositeQueries(string connectionString, string databaseName, string collectionName, bool waitForMutex, string mutextName)
+            : this(string.Empty, connectionString, databaseName, collectionName, waitForMutex, mutextName) { }
+
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CompositeQueries"/> class.
         /// </summary>
         /// <param name="name">The name.</param>
+        /// <param name="connectionString">The connection string.</param>
+        /// <param name="databaseName">Name of the database.</param>
+        /// <param name="collectionName">Name of the collection.</param>
         /// <param name="waitForMutex">if set to <c>true</c> [wait for mutex].</param>
-        public CompositeQueries(string name, bool waitForMutex) : base(name + "Composite Queries", waitForMutex) {
-            this.SimpleQuery = new SimpleQuery(waitForMutex);
-            this.FilterQuery = new FilterQuery(waitForMutex);
-            this.TagCountMapReduce = new TagCountMapReduce(waitForMutex);
-            this.CommentAuthorMapReduce = new CommentAuthorMapReduce(waitForMutex);
+        /// <param name="mutextName">Name of the mutext.</param>
+        public CompositeQueries(string name, string connectionString, string databaseName, string collectionName, bool waitForMutex, string mutextName)
+            : base(name + "Composite Queries", connectionString, databaseName, collectionName, waitForMutex, mutextName) {
+                this.SimpleQuery = new SimpleQuery(connectionString, databaseName, collectionName, waitForMutex, mutextName);
+                this.FilterQuery = new FilterQuery(connectionString, databaseName, collectionName, waitForMutex, mutextName);
+                this.TagCountMapReduce = new TagCountMapReduce(connectionString, databaseName, collectionName, waitForMutex, mutextName);
+                this.CommentAuthorMapReduce = new CommentAuthorMapReduce(connectionString, databaseName, collectionName, waitForMutex, mutextName);
         }
 
         /// <summary>

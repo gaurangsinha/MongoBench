@@ -16,13 +16,13 @@ namespace MongoBench.Benchmarks {
         /// <summary>
         /// Initializes a new instance of the <see cref="TagCountMapReduce"/> class.
         /// </summary>
-        public TagCountMapReduce() : this(false) { }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="TagCountMapReduce"/> class.
-        /// </summary>
+        /// <param name="connectionString">The connection string.</param>
+        /// <param name="databaseName">Name of the database.</param>
+        /// <param name="collectionName">Name of the collection.</param>
         /// <param name="waitForMutex">if set to <c>true</c> [wait for mutex].</param>
-        public TagCountMapReduce(bool waitForMutex) : base("Tag Count Map Reduce", waitForMutex) { }
+        /// <param name="mutextName">Name of the mutext.</param>
+        public TagCountMapReduce(string connectionString, string databaseName, string collectionName, bool waitForMutex, string mutextName)
+            : base("Tag Count Map Reduce", connectionString, databaseName, collectionName, waitForMutex, mutextName) { }
 
         /// <summary>
         /// Benchmarks.

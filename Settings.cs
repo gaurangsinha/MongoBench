@@ -3,16 +3,32 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Configuration;
+using System.Collections;
 
 namespace MongoBench {
     /// <summary>
     /// Application Settings
     /// </summary>
     public static class Settings {
+
+        private static List<KeyValuePair<string, string>> _CONNECTION_STRING = null;
         /// <summary>
-        /// Database connection string
+        /// Gets the Connection String.
         /// </summary>
-        public static string CONNECTION_STRING = ConfigurationManager.ConnectionStrings["MongoConnectionString"].ConnectionString;
+        /// <value>The Connection String.</value>
+        public static List<KeyValuePair<string, string>> CONNECTION_STRING {
+            get {
+                if (null == _CONNECTION_STRING) {
+                    _CONNECTION_STRING = new List<KeyValuePair<string, string>>();
+                    for(int i=0 ; i<ConfigurationManager.ConnectionStrings.Count; i++) {
+                        _CONNECTION_STRING.Add(new KeyValuePair<string, string>(
+                            ConfigurationManager.ConnectionStrings[i].Name,
+                            ConfigurationManager.ConnectionStrings[i].ConnectionString));
+                    }
+                }
+                return _CONNECTION_STRING;
+            }
+        }
 
         /// <summary>
         /// Mutext name to synchronize threads
@@ -38,10 +54,5 @@ namespace MongoBench {
         /// The fields on which indexes are supposed to be created
         /// </summary>
         public static string[] INDEX_FIELDS = ConfigurationManager.AppSettings["INDEX_FIELDS"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-        /// <summary>
-        /// The number of records to be inserted per thread
-        /// </summary>
-        public static int NUM_OF_RECORDS = 1000;
     }
 }

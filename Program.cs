@@ -23,8 +23,25 @@ namespace MongoBench {
         /// <param name="args">The args.</param>
         [MTAThread()]
         static void Main(string[] args) {
+            string filename = null;
             string input = null;
 
+            //Output filename
+            Console.Write("Output file name : ");
+            filename = Console.ReadLine();
+
+            //Select server
+            int server = 0;
+            Console.WriteLine("MongoDB Servers");
+            Console.WriteLine("0. All");
+            for (int i = 0; i < Settings.CONNECTION_STRING.Count; i++) {
+                Console.WriteLine("{0}. {1}", i + 1, Settings.CONNECTION_STRING[i].Key);
+            }
+            Console.Write("Select server [0] : ");
+            input = Console.ReadLine();
+            if (!int.TryParse(input, out server))
+                server = 0;
+            
             //Number of runs
             int numOfRuns = 3;
             Console.Write("Number of runs [3] : ");
@@ -40,55 +57,101 @@ namespace MongoBench {
                 numOfThreads = 1;
 
             //Number of records to insert per thread
+            int numOfRecords = 0;
             Console.Write("Records to insert per thread [1000] : ");
             input = Console.ReadLine();
-            if (!int.TryParse(input, out Settings.NUM_OF_RECORDS))
-                Settings.NUM_OF_RECORDS = 1000;
-
-            //Test connection string and database connection
-            bool connectionStatus = TestDatabaseConnection();
-            Console.WriteLine("Testing database connection... {0}", connectionStatus ? "OK" : "ERROR");
+            if (!int.TryParse(input, out numOfRecords))
+                numOfRecords = 1000;
 
             //Initialize temporary data
             bool dataInitialized = Data.Initialize();
-            Console.WriteLine("Initializing Temporary Data... {0}", dataInitialized ? "OK" : "ERROR");
+            Console.WriteLine("Initializing Temporary Data... {0}\n", dataInitialized ? "OK" : "ERROR");
+
+            if (dataInitialized) {
+                if (0 == server) {
+                    for (int i = 0; i < Settings.CONNECTION_STRING.Count; i++) {
+                        Run(i, numOfRuns, numOfThreads, numOfRecords, Settings.DATABASE_NAME, Settings.COLLECTION_NAME);
+                    }
+                }
+                else {
+                    Run(server - 1, numOfRuns, numOfThreads, numOfRecords, Settings.DATABASE_NAME, Settings.COLLECTION_NAME);
+                }
+            }
+            Console.WriteLine("\nCompleted.");
+        }
+
+
+        /// <summary>
+        /// Runs benchmarks for the specified connection string.
+        /// </summary>
+        /// <param name="connectionString">The connection string.</param>
+        private static void Run(int connectionStringIndex, int numOfRuns, int numOfThreads, int numOfRecords, string databaseName, string collectionName) {
+            //Test connection string and database connection
+            bool connectionStatus = TestDatabaseConnection(Settings.CONNECTION_STRING[connectionStringIndex].Value);
+            Console.WriteLine("Testing database connection [{0}]... {1}", Settings.CONNECTION_STRING[connectionStringIndex].Key, connectionStatus ? "OK" : "ERROR");
 
             BenchmarkBase[] benchmarks = new BenchmarkBase[numOfRuns * ((numOfThreads * 3) + 1)];
-            if (connectionStatus & dataInitialized) {
-                Console.WriteLine("\nRun\tThread\tTimee\tBenchmark");
+            if (connectionStatus) {
+                Console.WriteLine("Server,Run,Thread,Timee,Benchmark");
 
                 for (int run = 0; run < numOfRuns; run++) {
                     //Clean database
-                    CleanDatabase();
+                    CleanDatabase(Settings.CONNECTION_STRING[connectionStringIndex].Value, 
+                        Settings.DATABASE_NAME, 
+                        Settings.COLLECTION_NAME);
 
                     int index = run * ((numOfThreads * 3) + 1);
 
                     //Insert benchmarks
-                    BenchmarkBase[] results = ExecuteBenchmarks(numOfThreads, typeof(Insert), null);
-                    PrintResults(run, results);
+                    BenchmarkBase[] results = ExecuteBenchmarks(numOfThreads, 
+                                                typeof(Insert),
+                                                Settings.CONNECTION_STRING[connectionStringIndex].Value,
+                                                Settings.DATABASE_NAME, 
+                                                Settings.COLLECTION_NAME, 
+                                                numOfRecords, 
+                                                true,
+                                                Settings.MUTEX_NAME);
+                    PrintResults(Settings.CONNECTION_STRING[connectionStringIndex].Key, run, results);
                     Array.Copy(results, 0, benchmarks, index, results.Length);
 
                     //Query benchmarks
-                    results = ExecuteBenchmarks(numOfThreads, typeof(CompositeQueries), string.Empty, false);
-                    PrintResults(run, results);
+                    results = ExecuteBenchmarks(numOfThreads, 
+                                typeof(CompositeQueries),
+                                Settings.CONNECTION_STRING[connectionStringIndex].Value, 
+                                Settings.DATABASE_NAME, 
+                                Settings.COLLECTION_NAME, 
+                                true,
+                                Settings.MUTEX_NAME);
+                    PrintResults(Settings.CONNECTION_STRING[connectionStringIndex].Key, run, results);
                     index += results.Length;
                     Array.Copy(results, 0, benchmarks, index, results.Length);
 
                     //Create Index
                     index += results.Length;
-                    benchmarks[index] = new CreateIndex();
+                    benchmarks[index] = new CreateIndex(Settings.CONNECTION_STRING[connectionStringIndex].Value, 
+                                            Settings.DATABASE_NAME, 
+                                            Settings.COLLECTION_NAME, 
+                                            Settings.INDEX_FIELDS, 
+                                            false,
+                                            null);
                     benchmarks[index].ExecuteBenchmark();
-                    Console.WriteLine("{0}\t-\t{1}", run + 1, benchmarks[index].ToString());
+                    PrintResults(Settings.CONNECTION_STRING[connectionStringIndex].Key, run, 1, benchmarks[index]);
 
                     //Query benchmarks with indexes
-                    results = ExecuteBenchmarks(numOfThreads, typeof(CompositeQueries), "Indexed ", false);
-                    PrintResults(run, results);
+                    results = ExecuteBenchmarks(numOfThreads, 
+                                typeof(CompositeQueries), 
+                                "Indexed ",
+                                Settings.CONNECTION_STRING[connectionStringIndex].Value, 
+                                Settings.DATABASE_NAME, 
+                                Settings.COLLECTION_NAME, 
+                                true,
+                                Settings.MUTEX_NAME);
+                    PrintResults(Settings.CONNECTION_STRING[connectionStringIndex].Key, run, results);
                     index += 1;
                     Array.Copy(results, 0, benchmarks, index, results.Length);
                 }
                 Console.WriteLine("\nStatistics:");
-                CalculateStatistics(Settings.NUM_OF_RECORDS, benchmarks);
-                Console.WriteLine("\nCompleted.");
+                CalculateStatistics(numOfRecords, benchmarks);                
             }
         }
 
@@ -96,16 +159,15 @@ namespace MongoBench {
         /// Tests the database connection.
         /// </summary>
         /// <returns></returns>
-        private static bool TestDatabaseConnection() {
+        private static bool TestDatabaseConnection(string connectionString) {
             bool status = false;
             try {
-                var db = MongoDB.Driver.MongoServer.Create(Settings.CONNECTION_STRING);
+                var db = MongoDB.Driver.MongoServer.Create(connectionString);
                 db.Connect();
                 status = MongoDB.Driver.MongoServerState.Connected == db.State;
                 db.Disconnect();
             }
             catch (MongoDB.Driver.MongoException ex) {
-                Debug.Write(ex.ToString());
                 status = false;
             }
             return status;
@@ -114,19 +176,21 @@ namespace MongoBench {
         /// <summary>
         /// Cleans the database.
         /// </summary>
+        /// <param name="connectionString">The connection string.</param>
+        /// <param name="databaseName">Name of the database.</param>
+        /// <param name="collectionName">Name of the collection.</param>
         /// <returns></returns>
-        private static bool CleanDatabase() {
+        private static bool CleanDatabase(string connectionString, string databaseName, string collectionName) {
             bool status = false;
             try {
-                var db = MongoDB.Driver.MongoServer.Create(Settings.CONNECTION_STRING)[ConfigurationManager.AppSettings["DATABASE_NAME"]];
-                var posts = db[ConfigurationManager.AppSettings["COLLECTION_NAME"]];
+                var db = MongoDB.Driver.MongoServer.Create(connectionString)[databaseName];
+                var posts = db[collectionName];
                 var result = posts.RemoveAll();
-                db.DropCollection(ConfigurationManager.AppSettings["COLLECTION_NAME"]);
+                db.DropCollection(collectionName);
                 db.Drop();
                 status = (null != result) ? result.Ok : false;
             }
             catch (MongoDB.Driver.MongoException ex) {
-                Debug.Write(ex.ToString());
                 status = false;
             }
             return status;
@@ -180,14 +244,26 @@ namespace MongoBench {
         /// <summary>
         /// Prints the results.
         /// </summary>
+        /// <param name="server">The server.</param>
         /// <param name="run">The run.</param>
         /// <param name="benchmarks">The benchmarks.</param>
-        private static void PrintResults(int run, BenchmarkBase[] benchmarks) {
+        private static void PrintResults(string server, int run, BenchmarkBase[] benchmarks) {
             for (int i = 0; i < benchmarks.Length; i++) {
                 if (null != benchmarks[i]) {
-                    Console.WriteLine("{0}\t{1}\t{2}", run + 1, i + 1, benchmarks[i].ToString());
+                    PrintResults(server, run + 1, i + 1, benchmarks[i]);
                 }
             }
+        }
+
+        /// <summary>
+        /// Prints the results.
+        /// </summary>
+        /// <param name="server">The server.</param>
+        /// <param name="run">The run.</param>
+        /// <param name="thread">The thread.</param>
+        /// <param name="benchmark">The benchmark.</param>
+        private static void PrintResults(string server, int run, int thread, BenchmarkBase benchmark) {
+            Console.WriteLine("{0},{1},{2},{3:0.0000},{4}", server, run, thread, benchmark.Time.ElapsedMilliseconds / 1000.0, benchmark.Type);
         }
 
         /// <summary>

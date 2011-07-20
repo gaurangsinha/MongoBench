@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
+using System.Threading;
 
 namespace MongoBench.Benchmarks {
 
@@ -15,20 +16,20 @@ namespace MongoBench.Benchmarks {
         /// <summary>
         /// Initializes a new instance of the <see cref="CommentAuthorMapReduce"/> class.
         /// </summary>
-        public CommentAuthorMapReduce() : this(false) { }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="CommentAuthorMapReduce"/> class.
-        /// </summary>
+        /// <param name="connectionString">The connection string.</param>
+        /// <param name="databaseName">Name of the database.</param>
+        /// <param name="collectionName">Name of the collection.</param>
         /// <param name="waitForMutex">if set to <c>true</c> [wait for mutex].</param>
-        public CommentAuthorMapReduce(bool waitForMutex) : base("Comment Map Reduce", waitForMutex) { }
+        /// <param name="mutextName">Name of the mutext.</param>
+        public CommentAuthorMapReduce(string connectionString, string databaseName, string collectionName, bool waitForMutex, string mutextName)
+            : base("Comment Map Reduce", connectionString, databaseName, collectionName, waitForMutex, mutextName) { }
 
         /// <summary>
         /// Find the count of comments by author.
         /// </summary>
         public override void Benchmark() {
             var db = GetDatabase();
-            var collectionName = "MongoBenchTemp";
+            var collectionName = "MongoBenchTemp" + Thread.CurrentThread.ManagedThreadId.ToString();
             var result = db[Settings.COLLECTION_NAME]
                         .MapReduce(new BsonJavaScript(
                             @"function() {

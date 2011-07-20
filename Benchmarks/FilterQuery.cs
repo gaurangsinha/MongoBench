@@ -14,13 +14,13 @@ namespace MongoBench.Benchmarks {
         /// <summary>
         /// Initializes a new instance of the <see cref="FilterQuery"/> class.
         /// </summary>
-        public FilterQuery() : this(false) { }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="FilterQuery"/> class.
-        /// </summary>
+        /// <param name="connectionString">The connection string.</param>
+        /// <param name="databaseName">Name of the database.</param>
+        /// <param name="collectionName">Name of the collection.</param>
         /// <param name="waitForMutex">if set to <c>true</c> [wait for mutex].</param>
-        public FilterQuery(bool waitForMutex) : base("Filter Query", waitForMutex) { }
+        /// <param name="mutextName">Name of the mutext.</param>
+        public FilterQuery(string connectionString, string databaseName, string collectionName, bool waitForMutex, string mutextName)
+            : base("Filter Query", connectionString, databaseName, collectionName, waitForMutex, mutextName) { }
 
         /// <summary>
         /// Fetch posts where author name starts with 'A'
