@@ -122,6 +122,7 @@ namespace MongoBench {
                 var posts = db[ConfigurationManager.AppSettings["COLLECTION_NAME"]];
                 var result = posts.RemoveAll();
                 db.DropCollection(ConfigurationManager.AppSettings["COLLECTION_NAME"]);
+                db.Drop();
                 status = (null != result) ? result.Ok : false;
             }
             catch (MongoDB.Driver.MongoException ex) {

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
+using System.Threading;
 
 namespace MongoBench.Benchmarks {
 
@@ -28,7 +29,7 @@ namespace MongoBench.Benchmarks {
         /// </summary>
         public override void Benchmark() {
             var db = GetDatabase();
-            var collectionName = "MongoBenchTemp";
+            var collectionName = "MongoBenchTemp" + Thread.CurrentThread.ManagedThreadId.ToString();
             var result = db[Settings.COLLECTION_NAME]
                         .MapReduce(new BsonJavaScript(
                             @"function() {
