@@ -92,6 +92,8 @@ namespace MongoBench.Benchmarks {
             Time.Start();
             Benchmark();
             Time.Stop();
+
+            Log.Info(this.ToString());
         }
         
         /// <summary>
