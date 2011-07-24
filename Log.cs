@@ -28,7 +28,7 @@ namespace MongoBench {
         /// <summary>
         /// Logs
         /// </summary>
-        private static StringBuilder LOG = new StringBuilder();
+        internal static StringBuilder LOG = new StringBuilder();
         
         /// <summary>
         /// Log info

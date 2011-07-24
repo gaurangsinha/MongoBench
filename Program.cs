@@ -65,10 +65,11 @@ namespace MongoBench {
             bool dataInitialized = Data.Initialize();
             if (dataInitialized) {
                 Log.Info("Temporary data initialized successfully");
-                List<MultiRunBenchmark> benchmarks = new List<MultiRunBenchmark>();
+                MultiRunBenchmark[] benchmarks;
                 if (0 == server) {
+                    benchmarks = new MultiRunBenchmark[Settings.CONNECTION_STRING.Count];
                     for (int i = 0; i < Settings.CONNECTION_STRING.Count; i++) {
-                        var b = new MultiRunBenchmark(numOfRuns,
+                        benchmarks[i] = new MultiRunBenchmark(numOfRuns,
                                     Settings.CONNECTION_STRING[i].Key,
                                     Settings.CONNECTION_STRING[i].Value,
                                     numOfThreads,
@@ -77,24 +78,28 @@ namespace MongoBench {
                                     Settings.COLLECTION_NAME,
                                     Settings.MUTEX_NAME,
                                     Settings.INDEX_FIELDS);
-                        benchmarks.Add(b);
-                        b.Run();
-                        CalculateStatistics(b.Results);
+                        benchmarks[i].Run();
+                        //CalculateStatistics(b.Results);
                     }
                 }
                 else {
-                    var b = new MultiRunBenchmark(numOfRuns,
-                                Settings.CONNECTION_STRING[server].Key,
-                                Settings.CONNECTION_STRING[server].Value,
+                    benchmarks = new MultiRunBenchmark[1];
+                    benchmarks[0] = new MultiRunBenchmark(numOfRuns,
+                                Settings.CONNECTION_STRING[server - 1].Key,
+                                Settings.CONNECTION_STRING[server - 1].Value,
                                 numOfThreads,
                                 numOfRecords,
                                 Settings.DATABASE_NAME,
                                 Settings.COLLECTION_NAME,
                                 Settings.MUTEX_NAME,
                                 Settings.INDEX_FIELDS);
-                    b.Run();
-                    CalculateStatistics(b.Results);
+                    benchmarks[0].Run();
+                    //CalculateStatistics(b.Results);
                 }
+
+                //Print reports
+                Report report = new Report(Settings.TEMPLATE_REPORT_FILE, Settings.OUTPUT_REPORT_FILE);
+                report.PrintReport(benchmarks);
             }
             Log.Info("Benchmarks completed");
         }

@@ -338,9 +338,10 @@ namespace MongoBench {
                 var db = MongoDB.Driver.MongoServer.Create(connectionString)[databaseName];
                 var posts = db[collectionName];
                 var result = posts.RemoveAll();
-                //db.DropCollection(collectionName);
+                db.DropCollection(collectionName);
                 //db.Drop();
-                status = (null != result) ? result.Ok : true;
+                //status = (null != result) ? result.Ok : true;
+                status = posts.Count() == 0;
             }
             catch (MongoDB.Driver.MongoException ex) {
                 status = false;

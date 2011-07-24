@@ -54,5 +54,15 @@ namespace MongoBench {
         /// The fields on which indexes are supposed to be created
         /// </summary>
         public static string[] INDEX_FIELDS = ConfigurationManager.AppSettings["INDEX_FIELDS"].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+        /// <summary>
+        /// Report template
+        /// </summary>
+        public static string TEMPLATE_REPORT_FILE = ConfigurationManager.AppSettings["TEMPLATE_REPORT_FILE"];
+
+        /// <summary>
+        /// Filename for the report
+        /// </summary>
+        public static string OUTPUT_REPORT_FILE = ConfigurationManager.AppSettings["OUTPUT_REPORT_FILE"];
     }
 }
