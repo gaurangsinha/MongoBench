@@ -30,7 +30,7 @@ namespace MongoBench {
         /// <value>The results.</value>
         public List<BenchmarkBase> Results {
             get {
-                if (null != _Results) {
+                if (null == _Results) {
                     _Results = new List<BenchmarkBase>();
                     foreach (var b in this.ServerBenchmark) {
                         _Results.AddRange(b.Results);
@@ -48,8 +48,8 @@ namespace MongoBench {
         public double AvgInsertsPerThreadSecond {
             get {
                 return this.Results
-                            .Where(b => b.GetType() == typeof(Insert))
-                            .Average(b => (double)((Insert)b).NumOfRecords / (double)b.Time.ElapsedMilliseconds);
+                            .Where(b => null != b && b.GetType() == typeof(Insert))
+                            .Average(b => (double)((Insert)b).NumOfRecords / ((double)b.Time.ElapsedMilliseconds / 1000.0));
             }
         }
 
@@ -71,7 +71,7 @@ namespace MongoBench {
             get {
                 return this.Results
                             .Where(b => b.GetType() == typeof(CompositeQueries))
-                            .Average(b => ((CompositeQueries)b).SimpleQuery.Time.ElapsedMilliseconds);
+                            .Average(b => ((CompositeQueries)b).SimpleQuery.Time.ElapsedMilliseconds) / 1000.0;
             }
         }
 
@@ -83,7 +83,7 @@ namespace MongoBench {
             get {
                 return this.Results
                             .Where(b => b.GetType() == typeof(CompositeQueries))
-                            .Average(b => ((CompositeQueries)b).FilterQuery.Time.ElapsedMilliseconds);
+                            .Average(b => ((CompositeQueries)b).FilterQuery.Time.ElapsedMilliseconds) / 1000.0;
             }
         }
 
@@ -95,7 +95,7 @@ namespace MongoBench {
             get {
                 return this.Results
                             .Where(b => b.GetType() == typeof(CompositeQueries))
-                            .Average(b => ((CompositeQueries)b).TagCountMapReduce.Time.ElapsedMilliseconds);
+                            .Average(b => ((CompositeQueries)b).TagCountMapReduce.Time.ElapsedMilliseconds) / 1000.0;
             }
         }
 
@@ -107,7 +107,7 @@ namespace MongoBench {
             get {
                 return this.Results
                             .Where(b => b.GetType() == typeof(CompositeQueries))
-                            .Average(b => ((CompositeQueries)b).CommentAuthorMapReduce.Time.ElapsedMilliseconds);
+                            .Average(b => ((CompositeQueries)b).CommentAuthorMapReduce.Time.ElapsedMilliseconds) / 1000.0;
             }
         }
 
@@ -119,7 +119,7 @@ namespace MongoBench {
             get {
                 return this.Results
                             .Where(b => b.GetType() == typeof(CreateIndex))
-                            .Average(b => b.Time.ElapsedMilliseconds);
+                            .Average(b => b.Time.ElapsedMilliseconds) / 1000.0;
             }
         }
 
@@ -131,7 +131,7 @@ namespace MongoBench {
             get {
                 return this.Results
                             .Where(b => b.GetType() == typeof(CompositeQueries) && b.Type.StartsWith("Indexed"))
-                            .Average(b => ((CompositeQueries)b).SimpleQuery.Time.ElapsedMilliseconds);
+                            .Average(b => ((CompositeQueries)b).SimpleQuery.Time.ElapsedMilliseconds) / 1000.0;
             }
         }
 
@@ -144,7 +144,7 @@ namespace MongoBench {
             get {
                 return this.Results
                             .Where(b => b.GetType() == typeof(CompositeQueries) && b.Type.StartsWith("Indexed"))
-                            .Average(b => ((CompositeQueries)b).FilterQuery.Time.ElapsedMilliseconds);
+                            .Average(b => ((CompositeQueries)b).FilterQuery.Time.ElapsedMilliseconds) / 1000.0;
             }
         }
 
@@ -156,7 +156,7 @@ namespace MongoBench {
             get {
                 return this.Results
                             .Where(b => b.GetType() == typeof(CompositeQueries) && b.Type.StartsWith("Indexed"))
-                            .Average(b => ((CompositeQueries)b).TagCountMapReduce.Time.ElapsedMilliseconds);
+                            .Average(b => ((CompositeQueries)b).TagCountMapReduce.Time.ElapsedMilliseconds) / 1000.0;
             }
         }
 
@@ -168,7 +168,7 @@ namespace MongoBench {
             get {
                 return this.Results
                             .Where(b => b.GetType() == typeof(CompositeQueries) && b.Type.StartsWith("Indexed"))
-                            .Average(b => ((CompositeQueries)b).CommentAuthorMapReduce.Time.ElapsedMilliseconds);
+                            .Average(b => ((CompositeQueries)b).CommentAuthorMapReduce.Time.ElapsedMilliseconds) / 1000.0;
             }
         }
         #endregion
